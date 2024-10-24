@@ -18,12 +18,7 @@ def img_loader(path):
 def one_hot_encoding(image, num_classes=8):
     # Create a one hot encoded tensor
     one_hot = np.eye(num_classes)[image.astype(np.uint8)]
-
-    # Move the channel axis to the front
-    # one_hot = np.moveaxis(one_hot, -1, 0)
-
     return one_hot
-
 
 
 class ChangeDetectionDatset(Dataset):
@@ -91,10 +86,14 @@ class SemanticChangeDetectionDatset(Dataset):
 
     def __transforms(self, aug, pre_img, post_img, cd_label, t1_label, t2_label):
         if aug:
-            pre_img, post_img, cd_label, t1_label, t2_label = imutils.random_crop_mcd(pre_img, post_img, cd_label, t1_label, t2_label, self.crop_size)
-            pre_img, post_img, cd_label, t1_label, t2_label = imutils.random_fliplr_mcd(pre_img, post_img, cd_label, t1_label, t2_label)
-            pre_img, post_img, cd_label, t1_label, t2_label = imutils.random_flipud_mcd(pre_img, post_img, cd_label, t1_label, t2_label)
-            pre_img, post_img, cd_label, t1_label, t2_label = imutils.random_rot_mcd(pre_img, post_img, cd_label, t1_label, t2_label)
+            pre_img, post_img, cd_label, t1_label, t2_label = imutils.random_crop_mcd(
+                pre_img, post_img, cd_label, t1_label, t2_label, self.crop_size)
+            pre_img, post_img, cd_label, t1_label, t2_label = imutils.random_fliplr_mcd(
+                pre_img, post_img, cd_label, t1_label, t2_label)
+            pre_img, post_img, cd_label, t1_label, t2_label = imutils.random_flipud_mcd(
+                pre_img, post_img, cd_label, t1_label, t2_label)
+            pre_img, post_img, cd_label, t1_label, t2_label = imutils.random_rot_mcd(
+                pre_img, post_img, cd_label, t1_label, t2_label)
 
         pre_img = imutils.normalize_img(pre_img)  # imagenet normalization
         pre_img = np.transpose(pre_img, (2, 0, 1))
@@ -105,36 +104,42 @@ class SemanticChangeDetectionDatset(Dataset):
         return pre_img, post_img, cd_label, t1_label, t2_label
 
     def __getitem__(self, index):
-        if 'train' in self.data_pro_type:
-            pre_path = os.path.join(self.dataset_path, 'T1', self.data_list[index] + '.png')
-            post_path = os.path.join(self.dataset_path, 'T2', self.data_list[index] + '.png')
-            T1_label_path = os.path.join(self.dataset_path, 'GT_T1', self.data_list[index] + '.png')
-            T2_label_path = os.path.join(self.dataset_path, 'GT_T2', self.data_list[index] + '.png')
-            cd_label_path = os.path.join(self.dataset_path, 'GT_CD', self.data_list[index] + '.png')
-        else:
-            pre_path = os.path.join(self.dataset_path, 'T1', self.data_list[index])
-            post_path = os.path.join(self.dataset_path, 'T2', self.data_list[index])
-            T1_label_path = os.path.join(self.dataset_path, 'GT_T1', self.data_list[index])
-            T2_label_path = os.path.join(self.dataset_path, 'GT_T2', self.data_list[index])
-            cd_label_path = os.path.join(self.dataset_path, 'GT_CD', self.data_list[index])
+        # Modificación: Ajustar las rutas para modo 'test'
+        pre_path = os.path.join(self.dataset_path, 'T1', self.data_list[index])
+        post_path = os.path.join(self.dataset_path, 'T2', self.data_list[index])
 
         pre_img = self.loader(pre_path)
         post_img = self.loader(post_path)
-        t1_label = self.loader(T1_label_path)
-        t2_label = self.loader(T2_label_path)
-        cd_label = self.loader(cd_label_path)
-        cd_label = cd_label / 255
 
         if 'train' in self.data_pro_type:
-            pre_img, post_img, cd_label, t1_label, t2_label = self.__transforms(True, pre_img, post_img, cd_label, t1_label, t2_label)
-        else:
-            pre_img, post_img, cd_label, t1_label, t2_label = self.__transforms(False, pre_img, post_img, cd_label, t1_label, t2_label)
-            cd_label = np.asarray(cd_label)
-            t1_label = np.asarray(t1_label)
-            t2_label = np.asarray(t2_label)
+            # En entrenamiento, cargamos las etiquetas
+            T1_label_path = os.path.join(self.dataset_path, 'GT_T1', self.data_list[index] + '.png')
+            T2_label_path = os.path.join(self.dataset_path, 'GT_T2', self.data_list[index] + '.png')
+            cd_label_path = os.path.join(self.dataset_path, 'GT_CD', self.data_list[index] + '.png')
 
-        data_idx = self.data_list[index]
-        return pre_img, post_img, cd_label, t1_label, t2_label, data_idx
+            t1_label = self.loader(T1_label_path)
+            t2_label = self.loader(T2_label_path)
+            cd_label = self.loader(cd_label_path)
+            cd_label = cd_label / 255
+
+            pre_img, post_img, cd_label, t1_label, t2_label = self.__transforms(
+                True, pre_img, post_img, cd_label, t1_label, t2_label)
+
+            data_idx = self.data_list[index]
+            return pre_img, post_img, cd_label, t1_label, t2_label, data_idx
+        else:
+            # En inferencia, no cargamos las etiquetas y usamos placeholders
+            # Creamos etiquetas vacías (placeholders)
+            cd_label = np.zeros((pre_img.shape[0], pre_img.shape[1]), dtype=np.uint8)
+            t1_label = np.zeros((pre_img.shape[0], pre_img.shape[1]), dtype=np.uint8)
+            t2_label = np.zeros((pre_img.shape[0], pre_img.shape[1]), dtype=np.uint8)
+
+            # Aplicamos las transformaciones sin augmentación
+            pre_img, post_img, cd_label, t1_label, t2_label = self.__transforms(
+                False, pre_img, post_img, cd_label, t1_label, t2_label)
+
+            data_idx = self.data_list[index]
+            return pre_img, post_img, cd_label, t1_label, t2_label, data_idx
 
     def __len__(self):
         return len(self.data_list)
@@ -155,10 +160,14 @@ class DamageAssessmentDatset(Dataset):
 
     def __transforms(self, aug, pre_img, post_img, loc_label, clf_label):
         if aug:
-            pre_img, post_img, loc_label, clf_label = imutils.random_crop_bda(pre_img, post_img, loc_label, clf_label, self.crop_size)
-            pre_img, post_img, loc_label, clf_label = imutils.random_fliplr_bda(pre_img, post_img, loc_label, clf_label)
-            pre_img, post_img, loc_label, clf_label = imutils.random_flipud_bda(pre_img, post_img, loc_label, clf_label)
-            pre_img, post_img, loc_label, clf_label = imutils.random_rot_bda(pre_img, post_img, loc_label, clf_label)
+            pre_img, post_img, loc_label, clf_label = imutils.random_crop_bda(
+                pre_img, post_img, loc_label, clf_label, self.crop_size)
+            pre_img, post_img, loc_label, clf_label = imutils.random_fliplr_bda(
+                pre_img, post_img, loc_label, clf_label)
+            pre_img, post_img, loc_label, clf_label = imutils.random_flipud_bda(
+                pre_img, post_img, loc_label, clf_label)
+            pre_img, post_img, loc_label, clf_label = imutils.random_rot_bda(
+                pre_img, post_img, loc_label, clf_label)
 
         pre_img = imutils.normalize_img(pre_img)  # imagenet normalization
         pre_img = np.transpose(pre_img, (2, 0, 1))
@@ -169,7 +178,7 @@ class DamageAssessmentDatset(Dataset):
         return pre_img, post_img, loc_label, clf_label
 
     def __getitem__(self, index):
-        if 'train' in self.data_pro_type: 
+        if 'train' in self.data_pro_type:
             parts = self.data_list[index].rsplit('_', 2)
 
             pre_img_name = f"{parts[0]}_pre_disaster_{parts[1]}_{parts[2]}.png"
@@ -177,25 +186,27 @@ class DamageAssessmentDatset(Dataset):
 
             pre_path = os.path.join(self.dataset_path, 'images', pre_img_name)
             post_path = os.path.join(self.dataset_path, 'images', post_img_name)
-            
+
             loc_label_path = os.path.join(self.dataset_path, 'masks', pre_img_name)
             clf_label_path = os.path.join(self.dataset_path, 'masks', post_img_name)
         else:
             pre_path = os.path.join(self.dataset_path, 'images', self.data_list[index] + '_pre_disaster.png')
             post_path = os.path.join(self.dataset_path, 'images', self.data_list[index] + '_post_disaster.png')
-            loc_label_path = os.path.join(self.dataset_path, 'masks', self.data_list[index]+ '_pre_disaster.png')
-            clf_label_path = os.path.join(self.dataset_path, 'masks', self.data_list[index]+ '_post_disaster.png')
+            loc_label_path = os.path.join(self.dataset_path, 'masks', self.data_list[index] + '_pre_disaster.png')
+            clf_label_path = os.path.join(self.dataset_path, 'masks', self.data_list[index] + '_post_disaster.png')
 
         pre_img = self.loader(pre_path)
         post_img = self.loader(post_path)
-        loc_label = self.loader(loc_label_path)[:,:,0]
-        clf_label = self.loader(clf_label_path)[:,:,0]
+        loc_label = self.loader(loc_label_path)[:, :, 0]
+        clf_label = self.loader(clf_label_path)[:, :, 0]
 
         if 'train' in self.data_pro_type:
-            pre_img, post_img, loc_label, clf_label = self.__transforms(True, pre_img, post_img, loc_label, clf_label)
+            pre_img, post_img, loc_label, clf_label = self.__transforms(
+                True, pre_img, post_img, loc_label, clf_label)
             clf_label[clf_label == 0] = 255
         else:
-            pre_img, post_img, loc_label, clf_label = self.__transforms(False, pre_img, post_img, loc_label, clf_label)
+            pre_img, post_img, loc_label, clf_label = self.__transforms(
+                False, pre_img, post_img, loc_label, clf_label)
             loc_label = np.asarray(loc_label)
             clf_label = np.asarray(clf_label)
 
@@ -206,37 +217,39 @@ class DamageAssessmentDatset(Dataset):
         return len(self.data_list)
 
 
-def make_data_loader(args, **kwargs):  # **kwargs could be omitted
+def make_data_loader(args, **kwargs):
     if 'SYSU' in args.dataset or 'LEVIR-CD+' in args.dataset or 'WHU' in args.dataset:
-        dataset = ChangeDetectionDatset(args.train_dataset_path, args.train_data_name_list, args.crop_size, args.max_iters, args.type)
-        # train_sampler = DistributedSampler(dataset, shuffle=True)
+        dataset = ChangeDetectionDatset(
+            args.train_dataset_path, args.train_data_name_list, args.crop_size, args.max_iters, args.type)
         data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=args.shuffle, **kwargs, num_workers=16,
                                  drop_last=False)
         return data_loader
     elif 'xBD' in args.dataset:
-        dataset = DamageAssessmentDatset(args.train_dataset_path, args.train_data_name_list, args.crop_size, args.max_iters, args.type)
+        dataset = DamageAssessmentDatset(
+            args.train_dataset_path, args.train_data_name_list, args.crop_size, args.max_iters, args.type)
         data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=args.shuffle, **kwargs, num_workers=6,
                                  drop_last=False)
         return data_loader
-    
+
     elif 'SECOND' in args.dataset:
-        dataset = SemanticChangeDetectionDatset(args.train_dataset_path, args.train_data_name_list, args.crop_size, args.max_iters, args.type)
+        dataset = SemanticChangeDetectionDatset(
+            args.train_dataset_path, args.train_data_name_list, args.crop_size, args.max_iters, args.type)
         data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=args.shuffle, **kwargs, num_workers=16,
                                  drop_last=False)
         return data_loader
-    
+
     else:
         raise NotImplementedError
 
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description="SECOND DataLoader Test")
+    parser = argparse.ArgumentParser(description="DataLoader Test")
     parser.add_argument('--dataset', type=str, default='WHUBCD')
     parser.add_argument('--max_iters', type=int, default=10000)
     parser.add_argument('--type', type=str, default='train')
-    parser.add_argument('--dataset_path', type=str, default='D:/Workspace/Python/STCD/data/ST-WHU-BCD')
-    parser.add_argument('--data_list_path', type=str, default='./ST-WHU-BCD/train_list.txt')
+    parser.add_argument('--dataset_path', type=str, default='/path/to/your/dataset')
+    parser.add_argument('--data_list_path', type=str, default='./train_list.txt')
     parser.add_argument('--shuffle', type=bool, default=True)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--data_name_list', type=list)
@@ -244,12 +257,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     with open(args.data_list_path, "r") as f:
-        # data_name_list = f.read()
         data_name_list = [data_name.strip() for data_name in f]
     args.data_name_list = data_name_list
+
     train_data_loader = make_data_loader(args)
     for i, data in enumerate(train_data_loader):
         pre_img, post_img, labels, _ = data
         pre_data, post_data = Variable(pre_img), Variable(post_img)
         labels = Variable(labels)
-        print(i, "个inputs", pre_data.data.size(), "labels", labels.data.size())
+        print(i, "inputs", pre_data.data.size(), "labels", labels.data.size())
